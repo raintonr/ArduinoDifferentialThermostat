@@ -6,10 +6,7 @@
 #include <DallasTemperature.h>
 
 // How many milliseonds between 1-wire polling
-#define TEMPERATURE_POLL 10000
-
-// How many milliseonds between display update
-#define DISPLAY_UPDATE 500
+#define TEMPERATURE_POLL 5000
 
 // Debounce & long press
 #define DEBOUNCE_DELAY 50
@@ -28,11 +25,8 @@ OneWire oneWire(ONE_WIRE_BUS);
 // Pass oneWire reference to DallasTemperature library
 DallasTemperature sensors(&oneWire);
 
-int deviceCount = 0;
-float tempC;
-
 // OLED display TWI address
-#define OLED_ADDR   0x3C
+#define OLED_ADDR 0x3C
 
 Adafruit_SSD1306 display(-1);
 
@@ -86,21 +80,26 @@ void setup() {
   // locate devices on the bus
   Serial.print("Locating devices...");
   Serial.print("Found ");
-  deviceCount = sensors.getDeviceCount();
+  int deviceCount = sensors.getDeviceCount();
   Serial.print(deviceCount, DEC);
   Serial.println(" devices.");
   Serial.println("");
 }
 
-
 // Declare some globals for read temperatures & on/off thresholds
 
-float tHot, tCold, dtOn, dtOff;
+float dtOn, dtOff;
+float tempHigh, tempLow, dT;
+unsigned long pumpRunning = false;
 
 // Our display is 128x64 (wide/high).
 // 0,0 is top left
 // In text size 2 this gives 4 rows of 10 characters
 // Text size 1 gives 8 rows of 21 characters
+
+#define FONT_SIZE 2
+#define FONT_WIDTH 12
+#define FONT_HEIGHT 16
 
 void printTemp(float temp) {
   char buff[32];
@@ -117,10 +116,9 @@ void printTemp(float temp) {
 // 3 
 // 4 
 
-
 void drawSetupBack() {
   display.clearDisplay();
-  display.setTextSize(2);
+  display.setTextSize(FONT_SIZE);
   display.setTextColor(WHITE);
   display.setCursor(0, 0);
   display.print("tOn ");
@@ -130,7 +128,7 @@ void drawSetupBack() {
     display.print(":");
   }
 
-  display.setCursor(0, 1 * 16);
+  display.setCursor(0, 1 * FONT_HEIGHT);
   display.print("tOff");
   if (currentMode == MODE_SETOFF) {
     display.print(">");
@@ -145,11 +143,11 @@ void drawSetupBack() {
 void drawSetupVars() {
   Serial.println("drawSetupVars");
 
-  display.setTextSize(2);
+  display.setTextSize(FONT_SIZE);
   display.setTextColor(WHITE, BLACK);
-  display.setCursor(4 * 16, 0);
+  display.setCursor(5 * FONT_WIDTH, 0);
   printTemp(dtOn);
-  display.setCursor(4 * 16, 1 * 16);
+  display.setCursor(5 * FONT_WIDTH, 1 * FONT_HEIGHT);
   printTemp(dtOff);
   display.display();
 }
@@ -163,18 +161,18 @@ void drawSetupVars() {
 
 void drawRunBack() {
   display.clearDisplay();
-  display.setTextSize(2);
+  display.setTextSize(FONT_SIZE);
   display.setTextColor(WHITE);
   display.setCursor(0,0);
   display.print("tLow:");
 
-  display.setCursor(1 * 16, 1 * 16);
+  display.setCursor(1 * FONT_WIDTH, 1 * FONT_HEIGHT);
   display.print("tHi:");
 
-  display.setCursor(2 * 16, 2 * 16);
+  display.setCursor(2 * FONT_WIDTH, 2 * FONT_HEIGHT);
   display.print("dT:");
 
-  display.setCursor(1 * 16, 3 * 16);
+  display.setCursor(1 * FONT_WIDTH, 3 * FONT_HEIGHT);
   display.print("Run:");
 
   display.display();
@@ -182,35 +180,39 @@ void drawRunBack() {
 }
 
 void drawRunVars() {
-  display.setTextSize(2);
-  display.setTextColor(WHITE, BLACK);
-  display.setCursor(0, 5 * 16);
-  printTemp(tempC);
+  Serial.println("drawRunVars");
 
-  display.setCursor(1 * 16, 5 * 16);
-  printTemp(tempC);
+  display.setTextSize(FONT_SIZE);
+  display.setTextColor(WHITE, BLACK);
+  display.setCursor(5 * FONT_WIDTH, 0);
+  printTemp(tempLow);
+
+  display.setCursor(5 * FONT_WIDTH, 1 * 16);
+  printTemp(tempHigh);
  
+  display.setCursor(5 * FONT_WIDTH, 2 * 16);
+  printTemp(dT);
+
+  display.setCursor(5 * FONT_WIDTH, 3 * 16);
+  if (pumpRunning) {
+    display.print("ON ");
+  } else {
+    display.print("off ");
+  }
+
   display.display();
 }
 
 void poll1Wire() {
   // Send command to all the sensors for temperature conversion
   sensors.requestTemperatures(); 
-  
-  // Display temperature from each sensor
-  for (int lp = 0;  lp < deviceCount;  lp++)
-  {
-    Serial.print("Sensor ");
-    Serial.print(lp + 1);
-    Serial.print(" : ");
-    tempC = sensors.getTempCByIndex(lp);
-    Serial.print(tempC);
-    Serial.print("C  |  ");
-    Serial.println("");
-  }
+
+  // TODO: Setup for sensors
+  tempLow = sensors.getTempCByIndex(0);
+  tempHigh = sensors.getTempCByIndex(1);
 }
 
-// Button callbacks
+// Mode change
 
 void modeChange() {
   switch (currentMode) {
@@ -281,6 +283,13 @@ void loop() {
   if (currentMode == MODE_RUNNING) {
     if (millis() - lastPoll > TEMPERATURE_POLL) {
       poll1Wire();
+      dT = tempHigh - tempLow;
+      if (pumpRunning && dtOff <= dT) {
+        pumpRunning = false;
+      } else if (!pumpRunning && dtOn >= dT) {
+        pumpRunning = true;
+      }
+      // TODO: set relay
       drawRunVars();
       lastPoll = millis();
     }
