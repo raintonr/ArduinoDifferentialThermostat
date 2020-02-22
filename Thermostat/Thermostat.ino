@@ -1,77 +1,144 @@
 #include <Wire.h>
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_GFX.h>
-
-#include <OneWire.h>
 #include <DallasTemperature.h>
+#include <EEPROM.h>
+#include <OneWire.h>
+
+#define DEBUG 1
 
 // How many milliseonds between 1-wire polling
-#define TEMPERATURE_POLL 5000
+#define TEMPERATURE_POLL 2500
 
 // Debounce & long press
-#define DEBOUNCE_DELAY 50
+#define DEBOUNCE_DELAY 25
 #define LONG_PRESS 500
 
 // Which pins are our buttons on
 #define B1_PIN 8
 #define B2_PIN 9
 
+// ... and the relay
+#define RELAY_PIN 6
+
+// What address in the EEPROM are our settings?
+#define SETTINGS_ADDRESS 0
+
 // Data wire is plugged into digital pin 2 on the Arduino
 #define ONE_WIRE_BUS 7
 
 // Setup a oneWire instance to communicate with any OneWire device
 OneWire oneWire(ONE_WIRE_BUS);  
-
 // Pass oneWire reference to DallasTemperature library
 DallasTemperature sensors(&oneWire);
 
 // OLED display TWI address
 #define OLED_ADDR 0x3C
-
-Adafruit_SSD1306 display(-1);
-
 #if (SSD1306_LCDHEIGHT != 64)
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
 #endif
+Adafruit_SSD1306 display(-1);
 
 // We can have several modes of operation that are cycled through by
 // holding either button.
 // 
+// - Running
 // - Setting tOn
 // - Setting tOff
-// - Running
+// - Perform reset
 
-#define MODE_RUNNING 0
-#define MODE_SETON 1
-#define MODE_SETOFF 2
-
-unsigned long currentMode = MODE_RUNNING;
+enum mode {MODE_RUNNING, MODE_SETON, MODE_SETOFF, MODE_RESET};
 
 // Button structures so we can share debounce code, etc
 
 struct Button {
-  unsigned long pin;
-  unsigned long lastState = LOW;
+  int pin;
+  int lastState = LOW;
   unsigned long debounceTime = 0;
-  unsigned long pressed = false;
-  unsigned long released = true; /* Assume starting state of released */
-  float setupAdjust;
+  boolean pressed = false;
+  boolean released = true; /* Assume starting state of released */
+  int stepDirection;
 };
-
 struct Button b1, b2;
 
+//////////////////////////////////////////////////////////////////////
+// Declare some globals for read temperatures & pump state, etc.
+
+float tempHigh, tempLow, dT;
+boolean pumpRunning = false;
+int resetOption = 0;
+enum mode currentMode;
+
+//////////////////////////////////////////////////////////////////////
+// Settings that we will store in EEPROM.
+// We will store a magic number in the first element to check settings
+// are in ther EEPROM and not junk.
+
+#define EEPROM_MAGIC 8385
+
+struct Settings {
+  int setup;
+  float dtOn;
+  float dtOff;
+  DeviceAddress sensorLow;
+  DeviceAddress sensorHigh;
+};
+struct Settings settings;
+
+void saveSettings() {
+  Serial.println("Saving settings.");
+//  EEPROM.put(SETTINGS_ADDRESS, settings);
+}
+
+void factoryReset() {
+  Serial.println("Factory reset.");
+  settings.setup = 0;
+  settings.dtOn = 0;
+  settings.dtOff = 0;
+  memset(settings.sensorLow, 0, sizeof(DeviceAddress));
+  memset(settings.sensorHigh, 0, sizeof(DeviceAddress));
+}
+
+void loadSettings() {
+  // Read settings from EEPROM
+  EEPROM.get(SETTINGS_ADDRESS, settings);
+  
+  // Check EEPROM was setup and wipe if not
+  if (settings.setup != EEPROM_MAGIC) {
+    factoryReset();
+    settings.setup = EEPROM_MAGIC;
+  } else {
+    Serial.println("Loaded good settings.");
+  }
+}
+
+//////////////////////////////////////////////////////////////////////
+
+#define FONT_SIZE 2
+#define FONT_SIZE_SUP 1
+#define FONT_WIDTH 12
+#define FONT_HEIGHT 16
+
+//////////////////////////////////////////////////////////////////////
 void setup() {
   // Input buttons
   pinMode(B1_PIN, INPUT);
   b1.pin = B1_PIN;
-  b1.setupAdjust = 0.1;
+  b1.stepDirection = 1;
 
   pinMode(B2_PIN, INPUT);
   b2.pin = B2_PIN;
-  b2.setupAdjust = -0.1;
+  b2.stepDirection = -1;
+
+  // Relay
+  pinMode(RELAY_PIN, OUTPUT);
   
   // initialize and clear display
   display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
+  // We always use this size & colours
+  // (and if not, we always put it back)
+  display.setTextSize(FONT_SIZE);
+  display.setTextColor(WHITE, BLACK);
   drawRunBack();
 
   sensors.begin();  // Start up the library
@@ -86,27 +153,48 @@ void setup() {
   Serial.println("");
 }
 
-// Declare some globals for read temperatures & on/off thresholds
-
-float dtOn, dtOff;
-float tempHigh, tempLow, dT;
-unsigned long pumpRunning = false;
-
+//////////////////////////////////////////////////////////////////////
 // Our display is 128x64 (wide/high).
 // 0,0 is top left
 // In text size 2 this gives 4 rows of 10 characters
 // Text size 1 gives 8 rows of 21 characters
 
-#define FONT_SIZE 2
-#define FONT_WIDTH 12
-#define FONT_HEIGHT 16
+// Shared buffer for formatting.
+char buff[24];
 
-void printTemp(float temp) {
-  char buff[32];
-  int value = int(temp * 10);
-  sprintf(buff, "%c%2d.%01d", value < 0 ? '-' : ' ', value / 10, abs(value) % 10);
-  Serial.println(buff);
-  display.print(buff);
+void printTemp(int x, int y, float temp, int dps) {
+  // Round to 2DP - never include negative here
+  dtostrf(abs(temp), 3 + dps, dps, buff);
+  Serial.print("Buff >");
+  Serial.print(buff);
+  Serial.println("<");
+
+  // There's a bug in dtostrf which puts a negative sign
+  // in the first char for exact zero values. Remove that.
+  if (buff[0] == '-') {
+    buff[0] = ' ';
+  }
+
+  // If dps > 1 we will write those in a small font so...
+  if (dps > 1) {
+    // Write decimals first because we are going to destroy the
+    // string to write the integers in larger font.
+    display.setCursor((x+2) * FONT_WIDTH, y * FONT_HEIGHT);
+    display.setTextSize(FONT_SIZE_SUP);
+    display.print(&buff[2]);
+  
+    // Null out 3rd character to write just the first two
+    buff[2] = 0;
+    display.setCursor(x * FONT_WIDTH, y * FONT_HEIGHT);
+    display.setTextSize(FONT_SIZE);
+    display.print(buff);
+  } else {
+    display.setCursor(x * FONT_WIDTH, y * FONT_HEIGHT);
+    display.print(buff);
+  }
+
+  display.setCursor((x+4) * FONT_WIDTH, y * FONT_HEIGHT);
+  display.print(temp < 0 ? "-" : " ");
 }
 
 // Draw the setup screen:
@@ -117,9 +205,9 @@ void printTemp(float temp) {
 // 4 
 
 void drawSetupBack() {
+  Serial.println("drawSetupBack");
+
   display.clearDisplay();
-  display.setTextSize(FONT_SIZE);
-  display.setTextColor(WHITE);
   display.setCursor(0, 0);
   display.print("tOn ");
   if (currentMode == MODE_SETON) {
@@ -143,12 +231,10 @@ void drawSetupBack() {
 void drawSetupVars() {
   Serial.println("drawSetupVars");
 
-  display.setTextSize(FONT_SIZE);
-  display.setTextColor(WHITE, BLACK);
   display.setCursor(5 * FONT_WIDTH, 0);
-  printTemp(dtOn);
+  printTemp(5, 0, settings.dtOn, 1);
   display.setCursor(5 * FONT_WIDTH, 1 * FONT_HEIGHT);
-  printTemp(dtOff);
+  printTemp(5, 1, settings.dtOff, 1);
   display.display();
 }
 
@@ -161,8 +247,6 @@ void drawSetupVars() {
 
 void drawRunBack() {
   display.clearDisplay();
-  display.setTextSize(FONT_SIZE);
-  display.setTextColor(WHITE);
   display.setCursor(0,0);
   display.print("tLow:");
 
@@ -182,16 +266,10 @@ void drawRunBack() {
 void drawRunVars() {
   Serial.println("drawRunVars");
 
-  display.setTextSize(FONT_SIZE);
-  display.setTextColor(WHITE, BLACK);
   display.setCursor(5 * FONT_WIDTH, 0);
-  printTemp(tempLow);
-
-  display.setCursor(5 * FONT_WIDTH, 1 * 16);
-  printTemp(tempHigh);
- 
-  display.setCursor(5 * FONT_WIDTH, 2 * 16);
-  printTemp(dT);
+  printTemp(5, 0, tempLow, 2);
+  printTemp(5, 1, tempHigh, 2);
+  printTemp(5, 2, dT, 2);
 
   display.setCursor(5 * FONT_WIDTH, 3 * 16);
   if (pumpRunning) {
@@ -200,6 +278,37 @@ void drawRunVars() {
     display.print("off ");
   }
 
+  display.display();
+}
+
+// Draw the reset screen:
+//   1234567890
+// 1 !!RESET!!
+// 2   < NO >
+// 3   < NO >
+// 4  < YES >
+
+void drawResetBack() {
+  display.clearDisplay();
+  display.setCursor(0.5 * FONT_WIDTH, 0);
+  display.print("!!RESET!!");
+  display.setCursor(4 * FONT_WIDTH, 1 * FONT_HEIGHT);
+  display.print("NO");
+  display.setCursor(4 * FONT_WIDTH, 2 * FONT_HEIGHT);
+  display.print("NO");
+  display.setCursor(3.5 * FONT_WIDTH, 3 * FONT_HEIGHT);
+  display.print("YES");
+  display.display();
+  drawResetVars();
+}
+
+void drawResetVars() {
+  for (int lp = 0; lp < 3; lp++) {
+    display.setCursor(2.5 * FONT_WIDTH, (lp + 1) * FONT_HEIGHT);
+    display.print(resetOption == lp ? "<" : " ");
+    display.setCursor(6.5 * FONT_WIDTH, (lp + 1) * FONT_HEIGHT);
+    display.print(resetOption == lp ? ">" : " ");
+  }
   display.display();
 }
 
@@ -212,12 +321,13 @@ void poll1Wire() {
   tempHigh = sensors.getTempCByIndex(1);
 }
 
+//////////////////////////////////////////////////////////////////////
 // Mode change
 
 void modeChange() {
   switch (currentMode) {
     case MODE_RUNNING:
-      currentMode = MODE_SETON; 
+      currentMode = MODE_SETON;
       drawSetupBack();
       break;
 
@@ -227,20 +337,37 @@ void modeChange() {
       break;
     
     case MODE_SETOFF:
+      currentMode = MODE_RESET;
+      saveSettings();
+      resetOption = 0;
+      drawResetBack();
+      break;
+
+    case MODE_RESET:
+      if (resetOption == 2) {
+        // Yes, they really selected factory reset!
+        factoryReset();
+        saveSettings();
+      }        
       currentMode = MODE_RUNNING;
       drawRunBack();
       break;
   }
 }
 
+//////////////////////////////////////////////////////////////////////
+// Button handling
+// This is why we have button objects defined and setup above. So we
+// can use a function for the debounce/long press detection.
+
 void handleButton(Button *button) {
-  unsigned long state = digitalRead(button->pin);
+  int state = digitalRead(button->pin);
   if (state != button->lastState) {
     button->debounceTime = millis();
     button->lastState = state;
-  } else if ((millis() - button->debounceTime) > DEBOUNCE_DELAY) {
+  } else if ((millis() - button->debounceTime) >= DEBOUNCE_DELAY) {
     if (state == HIGH) {
-      if ((millis() - button->debounceTime) > LONG_PRESS && !button->pressed) {
+      if ((millis() - button->debounceTime) >= LONG_PRESS && !button->pressed) {
         // This is a long press, which always triggers mode change
         button->pressed = true;
         modeChange();
@@ -259,13 +386,21 @@ void handleButton(Button *button) {
             // Do nothing
             break;
           case MODE_SETON:
-            dtOn += button->setupAdjust;
+            settings.dtOn += button->stepDirection * 0.1;
             drawSetupVars();
             break;
           case MODE_SETOFF:
-            dtOff += button->setupAdjust;
+            settings.dtOff += button->stepDirection * 0.1;
             drawSetupVars();
             break;
+          case MODE_RESET:
+            resetOption += button->stepDirection;
+            if (resetOption > 2) {
+              resetOption = 2;
+            } else if (resetOption < 0) {
+              resetOption = 0;
+            }
+            drawResetVars();
         }
       }
       button->released = true;
@@ -273,23 +408,26 @@ void handleButton(Button *button) {
   }
 }
 
-// In main loop we're only going to read temperatures every x ms so keep an eye on
-// last time we read.
-// Note that millis() function loops back to zero every 50 days or so.
+//////////////////////////////////////////////////////////////////////
+// In main loop we're only going to read temperatures every x ms so
+// keep an eye on last time we read.
+//
+// Note that millis() function loops back to zero every 49 days or so but as
+// it's an unsigned long don't have to worry about this. Same for the above.
 
 unsigned long lastPoll = 0;
 
 void loop() {
   if (currentMode == MODE_RUNNING) {
-    if (millis() - lastPoll > TEMPERATURE_POLL) {
+    if (millis() - lastPoll >= TEMPERATURE_POLL) {
       poll1Wire();
       dT = tempHigh - tempLow;
-      if (pumpRunning && dtOff <= dT) {
+      if (pumpRunning && dT <= settings.dtOff) {
         pumpRunning = false;
-      } else if (!pumpRunning && dtOn >= dT) {
+      } else if (!pumpRunning && dT >= settings.dtOn) {
         pumpRunning = true;
       }
-      // TODO: set relay
+      digitalWrite(RELAY_PIN, pumpRunning ? HIGH : LOW);
       drawRunVars();
       lastPoll = millis();
     }
