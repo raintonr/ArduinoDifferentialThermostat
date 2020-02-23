@@ -32,15 +32,16 @@ void setupDisplay() {
 // Text size 1 gives 8 rows of 21 characters
 
 void printTemp(int x, int y, float temp, int dps) {
-  // Get the sign to display later while making temp positive 
-  const char *sign;
+  // Print the sign (or wipe with space)
+  oled.setCursor((x+4) * T_FONT_WIDTH, y * T_FONT_HEIGHT);
   if (temp < 0) {
     temp = -temp;
-    sign = "-";
+    oled.print("-");
   } else {
-    sign = " ";
+    oled.print(" ");
   }
 
+  // Round and format using itoa for efficiency
   // We only cater for 1 or 2 DPs
   float mult = dps > 1 ? 100 : 10;
 
@@ -51,28 +52,35 @@ void printTemp(int x, int y, float temp, int dps) {
 
   // Convert to integer and pull out decimals
   int value = temp;
-  int integer = int(value / mult);
+  int integer = value / mult;
   int decimals = value - (integer * mult);
 
+  // Write decimals...
+  oled.setCursor((x+2) * T_FONT_WIDTH, y * T_FONT_HEIGHT);
+  itoa(decimals, buff, 10);
   // If dps > 1 we will write those in a small font so...
   if (dps > 1) {
-    oled.setCursor((x+2) * T_FONT_WIDTH, y * T_FONT_HEIGHT);
     oled.set1X();
-    sprintf(buff, ".%02d", decimals);
+    oled.print(".");
+    // Zero pad 2dps
+    if (strlen(buff) < 2) {
+      oled.print("0");
+    }
     oled.print(buff);
-  
-    oled.setCursor(x * T_FONT_WIDTH, y * T_FONT_HEIGHT);
     oled.set2X();
-    sprintf(buff, "%2d", integer);
-    oled.print(buff);
   } else {
-    oled.setCursor(x * T_FONT_WIDTH, y * T_FONT_HEIGHT);
-    sprintf(buff, "%2d.%01d", integer, decimals);
+    oled.print(".");
     oled.print(buff);
   }
 
-  oled.setCursor((x+4) * T_FONT_WIDTH, y * T_FONT_HEIGHT);
-  oled.print(sign);
+  // Write integer...
+  oled.setCursor(x * T_FONT_WIDTH, y * T_FONT_HEIGHT);
+  itoa(integer, buff, 10);
+  // Space pad integer
+  if (strlen(buff) < 2) {
+    oled.print(" ");
+  }
+  oled.print(buff);
 }
 
 // Draw the setup screen:
@@ -137,7 +145,11 @@ void drawSetupVars(boolean drawAll) {
 
 void printHex(DeviceAddress address) {
   for (int lp = 0; lp < sizeof(DeviceAddress); lp++) {
-    sprintf(buff, "%02X", address[lp]);
+    itoa(address[lp], buff, 16);
+    // Zero pad each byte where necessary
+    if (strlen(buff) < 2) {
+      oled.print("0");
+    }
     oled.print(buff);
   }
 }
@@ -202,13 +214,17 @@ void drawRunBack() {
   drawRunVars();
 }
 
-boolean heartbeat = false;
+int heartbeat = 0;
+const char* hbStrings[] = {"-", "\\", "|", "/" };
 void drawHeartbeat() {
-  heartbeat = !heartbeat;
-
+  if (heartbeat >= 3) {
+    heartbeat = 0;
+  } else {
+    heartbeat++;
+  }
   oled.set1X();
   oled.setCursor(10 * T_FONT_WIDTH, 0);
-  oled.print(heartbeat ? "/" : "\\");
+  oled.print(hbStrings[heartbeat]);
   oled.set2X();
 }
 
