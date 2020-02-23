@@ -1,9 +1,8 @@
-#include <Wire.h>
 #include <Adafruit_SSD1306.h>
-#include <Adafruit_GFX.h>
 #include <DallasTemperature.h>
 #include <EEPROM.h>
 #include <OneWire.h>
+#include <Wire.h> // I2C
 
 #define DEBUG 1
 
@@ -87,7 +86,7 @@ struct Settings settings;
 
 void saveSettings() {
   Serial.println("Saving settings.");
-//  EEPROM.put(SETTINGS_ADDRESS, settings);
+  EEPROM.put(SETTINGS_ADDRESS, settings);
 }
 
 void factoryReset() {
@@ -121,6 +120,10 @@ void loadSettings() {
 
 //////////////////////////////////////////////////////////////////////
 void setup() {
+#ifdef DEBUG  
+  Serial.begin(57600);
+#endif
+
   // Input buttons
   pinMode(B1_PIN, INPUT);
   b1.pin = B1_PIN;
@@ -132,6 +135,9 @@ void setup() {
 
   // Relay
   pinMode(RELAY_PIN, OUTPUT);
+
+  // Load settings from EEPROM
+  loadSettings();
   
   // initialize and clear display
   display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
@@ -142,7 +148,6 @@ void setup() {
   drawRunBack();
 
   sensors.begin();  // Start up the library
-  Serial.begin(9600);
   
   // locate devices on the bus
   Serial.print("Locating devices...");
@@ -159,42 +164,48 @@ void setup() {
 // In text size 2 this gives 4 rows of 10 characters
 // Text size 1 gives 8 rows of 21 characters
 
-// Shared buffer for formatting.
-char buff[24];
-
 void printTemp(int x, int y, float temp, int dps) {
-  // Round to 2DP - never include negative here
-  dtostrf(abs(temp), 3 + dps, dps, buff);
-  Serial.print("Buff >");
-  Serial.print(buff);
-  Serial.println("<");
+  char buff[24];
 
-  // There's a bug in dtostrf which puts a negative sign
-  // in the first char for exact zero values. Remove that.
-  if (buff[0] == '-') {
-    buff[0] = ' ';
-  }
+  // Get the sign to display later
+  const char *sign = (temp < 0 ? "-" : " ");
+
+  // Now do everything in the positive domain
+
+  temp = abs(temp);
+
+  // We only cater for 1 or 2 DPs
+  float mult = dps > 1 ? 100 : 10;
+
+  // Multiply up...
+  temp *= mult;
+  // ... and add 0.5 to properly round up when applicable
+  temp += 0.5;
+
+  // Convert to integer and pull out decimals
+  int value = temp;
+  int integer = int(value / mult);
+  int decimals = value - (integer * mult);
 
   // If dps > 1 we will write those in a small font so...
   if (dps > 1) {
-    // Write decimals first because we are going to destroy the
-    // string to write the integers in larger font.
     display.setCursor((x+2) * FONT_WIDTH, y * FONT_HEIGHT);
     display.setTextSize(FONT_SIZE_SUP);
-    display.print(&buff[2]);
+    sprintf(buff, ".%02d", decimals);
+    display.print(buff);
   
-    // Null out 3rd character to write just the first two
-    buff[2] = 0;
     display.setCursor(x * FONT_WIDTH, y * FONT_HEIGHT);
     display.setTextSize(FONT_SIZE);
+    sprintf(buff, "%2d", integer);
     display.print(buff);
   } else {
     display.setCursor(x * FONT_WIDTH, y * FONT_HEIGHT);
+    sprintf(buff, "%2d.%01d", integer, decimals);
     display.print(buff);
   }
 
   display.setCursor((x+4) * FONT_WIDTH, y * FONT_HEIGHT);
-  display.print(temp < 0 ? "-" : " ");
+  display.print(sign);
 }
 
 // Draw the setup screen:
