@@ -10,14 +10,14 @@
 // #define DEBUG 1
 
 // How many milliseonds between 1-wire polling
-#define TEMPERATURE_POLL 2500
+#define TEMPERATURE_POLL 2000
 
 // Heartbeat display interval in ms
 #define HEARTBEAT 500
 
 // Debounce & long press
 #define DEBOUNCE_DELAY 25
-#define LONG_PRESS 500
+#define LONG_PRESS 250
 
 // Which pins are our buttons on
 #define B1_PIN 8
