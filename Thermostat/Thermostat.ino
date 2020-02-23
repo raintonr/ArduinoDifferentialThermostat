@@ -6,7 +6,8 @@
 #include "display.h"
 #include "globals.h"
 
-#define DEBUG 1
+// Uncomment for a bit of debug
+// #define DEBUG 1
 
 // How many milliseonds between 1-wire polling
 #define TEMPERATURE_POLL 2500
@@ -61,19 +62,25 @@ struct Settings settings;
 // Settings that we will store in EEPROM.
 // We will store a magic number in the first element to check settings
 // are in ther EEPROM and not junk.
+// Increment this when changing code so old settings are discarded.
 
-#define EEPROM_MAGIC 8385
+#define EEPROM_MAGIC 8386
 
 void saveSettings() {
+#ifdef DEBUG    
   Serial.println("Saving settings.");
+#endif
   EEPROM.put(SETTINGS_ADDRESS, settings);
 }
 
 void factoryReset() {
+#ifdef DEBUG    
   Serial.println("Factory reset.");
+#endif
   settings.setup = 0;
   settings.dtOn = 0;
   settings.dtOff = 0;
+  settings.tMax = 0;
   memset(settings.sensorLow, 0, sizeof(DeviceAddress));
   memset(settings.sensorHigh, 0, sizeof(DeviceAddress));
 }
@@ -87,7 +94,9 @@ void loadSettings() {
     factoryReset();
     settings.setup = EEPROM_MAGIC;
   } else {
+#ifdef DEBUG    
     Serial.println("Loaded good settings.");
+#endif
   }
 }
 
@@ -116,25 +125,61 @@ void setup() {
   // Initialise display
   setupDisplay();
 
-  sensors.begin();  // Start up the library
-  
-  // locate devices on the bus
-  Serial.print("Locating devices...");
-  Serial.print("Found ");
-  int deviceCount = sensors.getDeviceCount();
-  Serial.print(deviceCount, DEC);
-  Serial.println(" devices.");
-  Serial.println("");
+  // Start up the 1-wire library
+  sensors.begin();
 }
 
+// Check to make sure the passed address is not stored as a known
+// sensor.
+
+int addressCmp(DeviceAddress a1, DeviceAddress a2) {
+  int cmp = 0;
+  for (int lp = 0; lp < sizeof(DeviceAddress); lp++) {
+    if ((a1[lp]) != a2[lp]) {
+      cmp = a1[lp] - a2[lp];
+      break;
+    }
+  }
+  return cmp;
+}
+
+boolean isKnownSensor(DeviceAddress address) {
+  return ((addressCmp(address, settings.sensorLow) == 0 || addressCmp(address, settings.sensorLow) == 0) ? true : false);
+}
 
 void poll1Wire() {
-  // Send command to all the sensors for temperature conversion
-  sensors.requestTemperatures(); 
-
-  // TODO: Setup for sensors
-  tempLow = sensors.getTempCByIndex(0);
-  tempHigh = sensors.getTempCByIndex(1);
+  // If we don't have both sensors defined, poll the wire and
+  // put any new addresses found in our empty settings.
+  if (!allSensorsDefined()) {
+#ifdef DEBUG    
+    Serial.println("Searching for sensors...");
+#endif
+    DeviceAddress address;
+    int found = 0;
+    boolean updates = false;
+    while (oneWire.search(address)) {
+      found++;
+      if (isZeroAddress(settings.sensorLow) && !isKnownSensor(address)) {
+        memcpy(settings.sensorLow, address, sizeof(DeviceAddress));
+        updates = true;
+      } else if (isZeroAddress(settings.sensorHigh) && !isKnownSensor(address)) {
+        memcpy(settings.sensorHigh, address, sizeof(DeviceAddress));
+        updates = true;
+      }
+    }
+    if (updates) {
+      saveSettings();
+    }
+#ifdef DEBUG    
+    Serial.print("Found ");
+    Serial.print(found);
+    Serial.println(" sensors");
+#endif    
+  }
+  // We have our sensors defined, get their values
+  sensors.requestTemperatures();
+  tempLow = sensors.getTempC(settings.sensorLow);
+  tempHigh = sensors.getTempC(settings.sensorHigh);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -153,6 +198,11 @@ void modeChange() {
       break;
     
     case MODE_SETOFF:
+      currentMode = MODE_SETMAX;
+      drawSetupBack();
+      break;
+
+    case MODE_SETMAX:
       currentMode = MODE_RESET;
       saveSettings();
       resetOption = 0;
@@ -203,11 +253,15 @@ void handleButton(Button *button) {
             break;
           case MODE_SETON:
             settings.dtOn += button->stepDirection * 0.1;
-            drawSetupVars();
+            drawSetupVars(false);
             break;
           case MODE_SETOFF:
             settings.dtOff += button->stepDirection * 0.1;
-            drawSetupVars();
+            drawSetupVars(false);
+            break;
+          case MODE_SETMAX:
+            settings.tMax += button->stepDirection;
+            drawSetupVars(false);
             break;
           case MODE_RESET:
             resetOption += button->stepDirection;
@@ -233,19 +287,44 @@ void handleButton(Button *button) {
 
 unsigned long lastPoll = 0;
 unsigned long lastHeartbeat = 0;
+boolean wasInvalid = true;
 
 void loop() {
   if (currentMode == MODE_RUNNING) {
     if (millis() - lastPoll >= TEMPERATURE_POLL) {
       poll1Wire();
-      dT = tempHigh - tempLow;
-      if (pumpRunning && dT <= settings.dtOff) {
+
+      // Force display of sensors if they aren't both good
+      // We only do this in the running mode so that settings
+      // can be reached when sensors are bad.
+      // Regular running mode
+
+      if (!allSensorsDefined() || !isValidTemp(tempLow) || !isValidTemp(tempHigh)) {
+        // Show sensor screen
+        drawSensors();
+        // Force pump off on faulty sensors
         pumpRunning = false;
-      } else if (!pumpRunning && dT >= settings.dtOn) {
-        pumpRunning = true;
+        wasInvalid = true;
+      } else {
+        if (wasInvalid) {
+          wasInvalid = false;
+          drawRunBack();
+        }
+        dT = tempHigh - tempLow;
+        // Check for maximum temperature (on tempLow)
+        if (tempLow >= settings.tMax) {
+          pumpRunning = false;
+        } else {
+          // Temp below max, so pump based on dT
+          if (pumpRunning && dT <= settings.dtOff) {
+            pumpRunning = false;
+          } else if (!pumpRunning && dT >= settings.dtOn) {
+            pumpRunning = true;
+          }
+        }
+        drawRunVars();
       }
       digitalWrite(RELAY_PIN, pumpRunning ? HIGH : LOW);
-      drawRunVars();
       lastPoll = millis();
     }
   }

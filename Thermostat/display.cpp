@@ -12,9 +12,10 @@
 
 SSD1306AsciiWire oled;
 
-void setupDisplay() {
-  Serial.println("setupDisplay");
+// Shared buffer for formatting
+char buff[8];
 
+void setupDisplay() {
   Wire.begin();
   Wire.setClock(400000L);
 
@@ -22,9 +23,6 @@ void setupDisplay() {
   oled.setScrollMode(SCROLL_MODE_OFF);
   oled.setFont(Adafruit5x7);
   oled.set2X();
-
-  drawRunBack();
-  Serial.println("setupDisplay done");
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -34,11 +32,6 @@ void setupDisplay() {
 // Text size 1 gives 8 rows of 21 characters
 
 void printTemp(int x, int y, float temp, int dps) {
-  Serial.print("printTemp: ");
-  Serial.println(temp);
-
-  char buff[24];
-
   // Get the sign to display later
   const char *sign = (temp < 0 ? "-" : " ");
 
@@ -83,14 +76,12 @@ void printTemp(int x, int y, float temp, int dps) {
 
 // Draw the setup screen:
 //   1234567890
-// 1  tOn:-99.9
-// 2 tOff:-99.9
-// 3 
+// 1  tOn:99.9-
+// 2 tOff:99.9-
+// 3 tMax:99.9-
 // 4 
 
 void drawSetupBack() {
-  Serial.println("drawSetupBack");
-
   oled.clear();
   oled.setCursor(0, 0);
   oled.print("tOn ");
@@ -108,28 +99,92 @@ void drawSetupBack() {
     oled.print(":");
   }
 
-  drawSetupVars();
+  oled.setCursor(0, 2 * T_FONT_HEIGHT);
+  oled.print("tMax");
+  if (currentMode == MODE_SETMAX) {
+    oled.print(">");
+  } else {
+    oled.print(":");
+  }
+
+  drawSetupVars(true);
 }
 
-void drawSetupVars() {
-  Serial.println("drawSetupVars");
+void drawSetupVars(boolean drawAll) {
+  if (drawAll || currentMode == MODE_SETON) {
+    oled.setCursor(5 * T_FONT_WIDTH, 0);
+    printTemp(5, 0, settings.dtOn, 1);
+  }
+  if (drawAll || currentMode == MODE_SETOFF) {
+    oled.setCursor(5 * T_FONT_WIDTH, 1 * T_FONT_HEIGHT);
+    printTemp(5, 1, settings.dtOff, 1);
+  }
+  if (drawAll || currentMode == MODE_SETMAX) {
+    oled.setCursor(5 * T_FONT_WIDTH, 2 * T_FONT_HEIGHT);
+    printTemp(5, 2, settings.tMax, 1);
+  }
+}
 
-  oled.setCursor(5 * T_FONT_WIDTH, 0);
-  printTemp(5, 0, settings.dtOn, 1);
-  oled.setCursor(5 * T_FONT_WIDTH, 1 * T_FONT_HEIGHT);
-  printTemp(5, 1, settings.dtOff, 1);
+// Draw the sensors screen:
+//   1234567890
+// 1 tLow:
+// 2 12345678
+// 3 tHi:
+// 4 12345678
+//
+// There isn't a separate back/vals for this
+
+void printHex(DeviceAddress address) {
+  for (int lp = 0; lp < sizeof(DeviceAddress); lp++) {
+    sprintf(buff, "%02X", address[lp]);
+    oled.print(buff);
+  }
+}
+
+void drawSensors() {
+  oled.clear();
+  oled.setCursor(0,0);
+  oled.print("tLow:");
+  if (isValidTemp(tempLow)) {
+    printTemp(5, 0, tempLow, 2);
+  } else {
+    oled.setCursor(5 * T_FONT_WIDTH, 0);
+    oled.print("err!");
+  }
+  oled.setCursor(0, 2 * T_FONT_HEIGHT);
+  oled.print("tHi:");
+  if (isValidTemp(tempHigh)) {
+    printTemp(4, 2, tempHigh, 2);
+  } else {
+    oled.setCursor(4 * T_FONT_WIDTH, 2 * T_FONT_HEIGHT);
+    oled.print("err!");
+  }
+
+  oled.set1X();
+  oled.setCursor(0, 2);
+  if (isZeroAddress(settings.sensorLow)) {
+    oled.print("Connect tLow");
+  } else {
+    printHex(settings.sensorLow);
+  }
+  
+  oled.setCursor(0, 6);
+    if (isZeroAddress(settings.sensorHigh)) {
+    oled.print("Connect tHi");
+  } else {
+    printHex(settings.sensorHigh);
+  }
+  oled.set2X();
 }
 
 // Draw the running screen:
 //   1234567890
-// 1 tLow:-99.9
-// 2  tHi:-99.9
-// 3   dT:
+// 1 tLow:99.9-
+// 2  tHi:99.9-
+// 3   dT:99.9-
 // 4  Run: OFF
 
 void drawRunBack() {
-  Serial.println("drawRunBack");
-
   oled.clear();
   oled.setCursor(0,0);
   oled.print("tLow:");
@@ -157,8 +212,6 @@ void drawHeartbeat() {
 }
 
 void drawRunVars() {
-  Serial.println("drawRunVars");
-
   oled.setCursor(5 * T_FONT_WIDTH, 0);
   printTemp(5, 0, tempLow, 2);
   printTemp(5, 1, tempHigh, 2);
@@ -180,8 +233,6 @@ void drawRunVars() {
 // 4  < YES >
 
 void drawResetBack() {
-  Serial.println("drawResetBack");
-
   oled.clear();
   oled.setCursor(0.5 * T_FONT_WIDTH, 0);
   oled.print("!!RESET!!");
@@ -195,12 +246,31 @@ void drawResetBack() {
 }
 
 void drawResetVars() {
-  Serial.println("drawResetVars");
-
   for (int lp = 0; lp < 3; lp++) {
     oled.setCursor(2.5 * T_FONT_WIDTH, (lp + 1) * T_FONT_HEIGHT);
     oled.print(resetOption == lp ? "<" : " ");
     oled.setCursor(6.5 * T_FONT_WIDTH, (lp + 1) * T_FONT_HEIGHT);
     oled.print(resetOption == lp ? ">" : " ");
   }
+}
+
+// Check to see if sensors are setup
+
+boolean isZeroAddress(DeviceAddress address) {
+  boolean allZero = true;
+  for (int lp = 0; lp < sizeof(DeviceAddress); lp++) {
+    if ((address[lp]) != 0) {
+      allZero = false;
+      break;
+    }
+  }
+  return allZero;
+}
+
+boolean isValidTemp(float temp) {
+  return (temp > -100 && temp < 200);
+}
+
+boolean allSensorsDefined() {
+  return (!isZeroAddress(settings.sensorLow) && !isZeroAddress(settings.sensorHigh));
 }
