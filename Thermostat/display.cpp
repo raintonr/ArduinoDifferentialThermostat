@@ -146,6 +146,16 @@ void drawRunBack() {
   drawRunVars();
 }
 
+boolean heartbeat = false;
+void drawHeartbeat() {
+  heartbeat = !heartbeat;
+
+  oled.set1X();
+  oled.setCursor(10 * T_FONT_WIDTH, 0);
+  oled.print(heartbeat ? "/" : "\\");
+  oled.set2X();
+}
+
 void drawRunVars() {
   Serial.println("drawRunVars");
 

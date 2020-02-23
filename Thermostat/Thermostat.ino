@@ -11,6 +11,9 @@
 // How many milliseonds between 1-wire polling
 #define TEMPERATURE_POLL 2500
 
+// Heartbeat display interval in ms
+#define HEARTBEAT 500
+
 // Debounce & long press
 #define DEBOUNCE_DELAY 25
 #define LONG_PRESS 500
@@ -229,6 +232,7 @@ void handleButton(Button *button) {
 // it's an unsigned long don't have to worry about this. Same for the above.
 
 unsigned long lastPoll = 0;
+unsigned long lastHeartbeat = 0;
 
 void loop() {
   if (currentMode == MODE_RUNNING) {
@@ -244,6 +248,12 @@ void loop() {
       drawRunVars();
       lastPoll = millis();
     }
+  }
+
+  // Always show heartbeat
+  if (millis() - lastHeartbeat >= HEARTBEAT) {
+    drawHeartbeat();
+    lastHeartbeat = millis();
   }
 
   // Button stuff with debounce
