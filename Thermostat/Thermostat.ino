@@ -12,6 +12,9 @@
 // How many milliseonds between 1-wire polling
 #define TEMPERATURE_POLL 2000
 
+// How many milliseonds after 1-wire polling should we read temperatures
+#define TEMPERATURE_READ_DELAY 750
+
 // Heartbeat display interval in ms
 #define HEARTBEAT 500
 
@@ -177,7 +180,12 @@ void poll1Wire() {
 #endif    
   }
   // We have our sensors defined, get their values
+  sensors.setWaitForConversion(false);  // makes it async
   sensors.requestTemperatures();
+  sensors.setWaitForConversion(true);
+}
+
+void read1Wire() {
   tempLow = sensors.getTempC(settings.sensorLow);
   tempHigh = sensors.getTempC(settings.sensorHigh);
 }
@@ -288,11 +296,19 @@ void handleButton(Button *button) {
 unsigned long lastPoll = 0;
 unsigned long lastHeartbeat = 0;
 boolean wasInvalid = true;
+boolean doneSensorRead = false;
 
 void loop() {
   if (currentMode == MODE_RUNNING) {
     if (millis() - lastPoll >= TEMPERATURE_POLL) {
+      // Poll requests temperatures but doesn't wait to read, we do that below
+      lastPoll = millis();
+      doneSensorRead = false;
       poll1Wire();
+    } else if (millis() - lastPoll >= TEMPERATURE_READ_DELAY && !doneSensorRead) {
+      // Poll should have a result, go read them
+      read1Wire();
+      doneSensorRead = true;
 
       // Force display of sensors if they aren't both good
       // We only do this in the running mode so that settings
@@ -325,7 +341,6 @@ void loop() {
         drawRunVars();
       }
       digitalWrite(RELAY_PIN, pumpRunning ? HIGH : LOW);
-      lastPoll = millis();
     }
   }
 
