@@ -1,7 +1,6 @@
 #include <DallasTemperature.h>
 #include <EEPROM.h>
 #include <OneWire.h>
-#include <Wire.h> // I2C
 
 // Our headers
 #include "display.h"
@@ -49,10 +48,10 @@ struct Button b1, b2;
 //////////////////////////////////////////////////////////////////////
 // Declare some globals for read temperatures & pump state, etc.
 
-float tempHigh, tempLow, dT;
+float tempHigh = 0, tempLow = 0, dT = 0;
 boolean pumpRunning = false;
 int resetOption = 0;
-enum mode currentMode;
+enum mode currentMode = MODE_RUNNING;
 struct Settings settings;
 
 //////////////////////////////////////////////////////////////////////
@@ -92,7 +91,8 @@ void loadSettings() {
 //////////////////////////////////////////////////////////////////////
 void setup() {
 #ifdef DEBUG  
-  Serial.begin(57600);
+  Serial.begin(19200);
+  Serial.println("Starting...");
 #endif
 
   // Input buttons

@@ -1,28 +1,30 @@
-#include <Adafruit_SSD1306.h>
+#include <SSD1306Ascii.h>
+#include <SSD1306AsciiWire.h>
 
 #include "display.h"
 #include "globals.h"
 
-// OLED display TWI address
-#define OLED_ADDR 0x3C
-#if (SSD1306_LCDHEIGHT != 64)
-#error("Height incorrect, please fix Adafruit_SSD1306.h!");
-#endif
-Adafruit_SSD1306 display(-1);
+// 0X3C+SA0 - 0x3C or 0x3D
+#define I2C_ADDRESS 0x3C
 
-#define FONT_SIZE 2
-#define FONT_SIZE_SUP 1
-#define FONT_WIDTH 12
-#define FONT_HEIGHT 16
+#define T_FONT_WIDTH 12
+#define T_FONT_HEIGHT 2
+
+SSD1306AsciiWire oled;
 
 void setupDisplay() {
-  // initialize and clear display
-  display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
-  // We always use this size & colours
-  // (and if not, we always put it back)
-  display.setTextSize(FONT_SIZE);
-  display.setTextColor(WHITE, BLACK);
+  Serial.println("setupDisplay");
+
+  Wire.begin();
+  Wire.setClock(400000L);
+
+  oled.begin(&Adafruit128x64, I2C_ADDRESS);
+  oled.setScrollMode(SCROLL_MODE_OFF);
+  oled.setFont(Adafruit5x7);
+  oled.set2X();
+
   drawRunBack();
+  Serial.println("setupDisplay done");
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -32,6 +34,9 @@ void setupDisplay() {
 // Text size 1 gives 8 rows of 21 characters
 
 void printTemp(int x, int y, float temp, int dps) {
+  Serial.print("printTemp: ");
+  Serial.println(temp);
+
   char buff[24];
 
   // Get the sign to display later
@@ -57,23 +62,23 @@ void printTemp(int x, int y, float temp, int dps) {
 
   // If dps > 1 we will write those in a small font so...
   if (dps > 1) {
-    display.setCursor((x+2) * FONT_WIDTH, y * FONT_HEIGHT);
-    display.setTextSize(FONT_SIZE_SUP);
+    oled.setCursor((x+2) * T_FONT_WIDTH, y * T_FONT_HEIGHT);
+    oled.set1X();
     sprintf(buff, ".%02d", decimals);
-    display.print(buff);
+    oled.print(buff);
   
-    display.setCursor(x * FONT_WIDTH, y * FONT_HEIGHT);
-    display.setTextSize(FONT_SIZE);
+    oled.setCursor(x * T_FONT_WIDTH, y * T_FONT_HEIGHT);
+    oled.set2X();
     sprintf(buff, "%2d", integer);
-    display.print(buff);
+    oled.print(buff);
   } else {
-    display.setCursor(x * FONT_WIDTH, y * FONT_HEIGHT);
+    oled.setCursor(x * T_FONT_WIDTH, y * T_FONT_HEIGHT);
     sprintf(buff, "%2d.%01d", integer, decimals);
-    display.print(buff);
+    oled.print(buff);
   }
 
-  display.setCursor((x+4) * FONT_WIDTH, y * FONT_HEIGHT);
-  display.print(sign);
+  oled.setCursor((x+4) * T_FONT_WIDTH, y * T_FONT_HEIGHT);
+  oled.print(sign);
 }
 
 // Draw the setup screen:
@@ -86,35 +91,33 @@ void printTemp(int x, int y, float temp, int dps) {
 void drawSetupBack() {
   Serial.println("drawSetupBack");
 
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.print("tOn ");
+  oled.clear();
+  oled.setCursor(0, 0);
+  oled.print("tOn ");
   if (currentMode == MODE_SETON) {
-    display.print(">");
+    oled.print(">");
   } else {
-    display.print(":");
+    oled.print(":");
   }
 
-  display.setCursor(0, 1 * FONT_HEIGHT);
-  display.print("tOff");
+  oled.setCursor(0, 1 * T_FONT_HEIGHT);
+  oled.print("tOff");
   if (currentMode == MODE_SETOFF) {
-    display.print(">");
+    oled.print(">");
   } else {
-    display.print(":");
+    oled.print(":");
   }
 
-  display.display();
   drawSetupVars();
 }
 
 void drawSetupVars() {
   Serial.println("drawSetupVars");
 
-  display.setCursor(5 * FONT_WIDTH, 0);
+  oled.setCursor(5 * T_FONT_WIDTH, 0);
   printTemp(5, 0, settings.dtOn, 1);
-  display.setCursor(5 * FONT_WIDTH, 1 * FONT_HEIGHT);
+  oled.setCursor(5 * T_FONT_WIDTH, 1 * T_FONT_HEIGHT);
   printTemp(5, 1, settings.dtOff, 1);
-  display.display();
 }
 
 // Draw the running screen:
@@ -125,39 +128,38 @@ void drawSetupVars() {
 // 4  Run: OFF
 
 void drawRunBack() {
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.print("tLow:");
+  Serial.println("drawRunBack");
 
-  display.setCursor(1 * FONT_WIDTH, 1 * FONT_HEIGHT);
-  display.print("tHi:");
+  oled.clear();
+  oled.setCursor(0,0);
+  oled.print("tLow:");
 
-  display.setCursor(2 * FONT_WIDTH, 2 * FONT_HEIGHT);
-  display.print("dT:");
+  oled.setCursor(1 * T_FONT_WIDTH, 1 * T_FONT_HEIGHT);
+  oled.print("tHi:");
 
-  display.setCursor(1 * FONT_WIDTH, 3 * FONT_HEIGHT);
-  display.print("Run:");
+  oled.setCursor(2 * T_FONT_WIDTH, 2 * T_FONT_HEIGHT);
+  oled.print("dT:");
 
-  display.display();
+  oled.setCursor(1 * T_FONT_WIDTH, 3 * T_FONT_HEIGHT);
+  oled.print("Run:");
+
   drawRunVars();
 }
 
 void drawRunVars() {
   Serial.println("drawRunVars");
 
-  display.setCursor(5 * FONT_WIDTH, 0);
+  oled.setCursor(5 * T_FONT_WIDTH, 0);
   printTemp(5, 0, tempLow, 2);
   printTemp(5, 1, tempHigh, 2);
   printTemp(5, 2, dT, 2);
 
-  display.setCursor(5 * FONT_WIDTH, 3 * 16);
+  oled.setCursor(5 * T_FONT_WIDTH, 3 * T_FONT_HEIGHT);
   if (pumpRunning) {
-    display.print("ON ");
+    oled.print("ON ");
   } else {
-    display.print("off ");
+    oled.print("off ");
   }
-
-  display.display();
 }
 
 // Draw the reset screen:
@@ -168,25 +170,27 @@ void drawRunVars() {
 // 4  < YES >
 
 void drawResetBack() {
-  display.clearDisplay();
-  display.setCursor(0.5 * FONT_WIDTH, 0);
-  display.print("!!RESET!!");
-  display.setCursor(4 * FONT_WIDTH, 1 * FONT_HEIGHT);
-  display.print("NO");
-  display.setCursor(4 * FONT_WIDTH, 2 * FONT_HEIGHT);
-  display.print("NO");
-  display.setCursor(3.5 * FONT_WIDTH, 3 * FONT_HEIGHT);
-  display.print("YES");
-  display.display();
+  Serial.println("drawResetBack");
+
+  oled.clear();
+  oled.setCursor(0.5 * T_FONT_WIDTH, 0);
+  oled.print("!!RESET!!");
+  oled.setCursor(4 * T_FONT_WIDTH, 1 * T_FONT_HEIGHT);
+  oled.print("NO");
+  oled.setCursor(4 * T_FONT_WIDTH, 2 * T_FONT_HEIGHT);
+  oled.print("NO");
+  oled.setCursor(3.5 * T_FONT_WIDTH, 3 * T_FONT_HEIGHT);
+  oled.print("YES");
   drawResetVars();
 }
 
 void drawResetVars() {
+  Serial.println("drawResetVars");
+
   for (int lp = 0; lp < 3; lp++) {
-    display.setCursor(2.5 * FONT_WIDTH, (lp + 1) * FONT_HEIGHT);
-    display.print(resetOption == lp ? "<" : " ");
-    display.setCursor(6.5 * FONT_WIDTH, (lp + 1) * FONT_HEIGHT);
-    display.print(resetOption == lp ? ">" : " ");
+    oled.setCursor(2.5 * T_FONT_WIDTH, (lp + 1) * T_FONT_HEIGHT);
+    oled.print(resetOption == lp ? "<" : " ");
+    oled.setCursor(6.5 * T_FONT_WIDTH, (lp + 1) * T_FONT_HEIGHT);
+    oled.print(resetOption == lp ? ">" : " ");
   }
-  display.display();
 }
