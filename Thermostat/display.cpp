@@ -213,21 +213,6 @@ void drawRunBack() {
 
   drawRunVars();
 }
-
-int heartbeat = 0;
-const char* hbStrings[] = {"-", "\\", "|", "/" };
-void drawHeartbeat() {
-  if (heartbeat >= 3) {
-    heartbeat = 0;
-  } else {
-    heartbeat++;
-  }
-  oled.set1X();
-  oled.setCursor(10 * T_FONT_WIDTH, 0);
-  oled.print(hbStrings[heartbeat]);
-  oled.set2X();
-}
-
 void drawRunVars() {
   oled.setCursor(5 * T_FONT_WIDTH, 0);
   printTemp(5, 0, tempLow, 2);
@@ -269,6 +254,22 @@ void drawResetVars() {
     oled.setCursor(6.5 * T_FONT_WIDTH, (lp + 1) * T_FONT_HEIGHT);
     oled.print(resetOption == lp ? ">" : " ");
   }
+}
+
+// Heartbeat
+
+int heartbeat = 0;
+const char* hbStrings[] = {"-", "\\", "|", "/" };
+void drawHeartbeat() {
+  if (heartbeat >= 3) {
+    heartbeat = 0;
+  } else {
+    heartbeat++;
+  }
+  oled.set1X();
+  oled.setCursor(123, 0);
+  oled.print(hbStrings[heartbeat]);
+  oled.set2X();
 }
 
 // Check to see if sensors are setup
