@@ -32,12 +32,13 @@ void setupDisplay() {
 // Text size 1 gives 8 rows of 21 characters
 
 void printTemp(int x, int y, float temp, int dps) {
-  // Get the sign to display later
-  const char *sign = (temp < 0 ? "-" : " ");
-
-  // Now do everything in the positive domain
+  // Get the sign to display later while making temp positive 
+  const char *sign;
   if (temp < 0) {
     temp = -temp;
+    sign = "-";
+  } else {
+    sign = " ";
   }
 
   // We only cater for 1 or 2 DPs
