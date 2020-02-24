@@ -17,6 +17,8 @@ On first run, if both DS18B20 sensors are connected the screen will display 'Run
 - dT - Difference between the two sensors.
 - Run - Status of the relay (on or off).
 
+In this mode (and only this mode), the relay will turn on and off automatically based on the sensors and settings values configured.
+
 ### Settings screen
 
 From 'Running mode' an extra long press (default of 1.5s) on either button moves to the settings screen. In this screen temperatures are not sensed and the relay will not turn on or off automatically.
@@ -46,6 +48,35 @@ Factory Reset shows 3 options: "NO", "NO" and "YES". The selected option is high
 
 If either "NO" is highlighted on using long press to return to 'Running' mode then no action will be taken. If "YES" is highlighed then all settings will be wiped (set to zero) and sensor addresses will also be cleared. This is basically the same as power on for the first time.
 
+### Sensors screen
+
+If the 1-Wire bus does not have 2 sensors preset, or they both cannot be read, or a sensor is swapped out for one that was previously present (ie. a DS18B20 failed and was replaced) then this screen with the status of tLow & tHi is shown.
+
+On sensor removal or failure this 'Sensors' screen is only shown from the 'Running' screen. Ie. if a sensor fails when adjusting settings then nothing will happen.
+
+This screen shows for each sensor:
+
+- The current temperature or "err!" if the value cannot be read.
+- The sensor's 1-Wire address if setup, or a message requesting it is connected.
+
+#### First run
+
+Also applicable after performing a factory reset.
+
+If the board is first run with no sensors connected then this 'Sensors' screen will appear with the message "Connect tLow" (or tHi) showing.
+
+In this case, the next sensor detected on the 1-Wire bus will be assigned to the missing role. Eg. from no sensors found, connecting a sensor will assign this to tLow. Connecting a second sensor will assign that to tHi.
+
+In practice this means that if 2 (or more) sensors are connected to the 1-Wire bus on first run (or factory reset) they will be instantly detected and assigned to tLow & tHi in the order of that detection which may appear random. The only way to avoid 'random' assignment of roles to each sensor is to connect tLow then tHi in sequence as mentioned above.
+
+#### Replacing a sensor
+
+If a sensor fails then this 'Sensors' screen will be shown with an "err!" message showing which sensor is bad.
+
+As sensors are assigned roles based on their address, and these are unique to every sensor then it is not possible to simply swap a defective sensor for a new one.
+
+In this case, perform a 'Factory Reset' as described above and follow the 'First run' procedure above to re-assign sensor roles as applicable.
+
 ## Hardware
 
 Connect the following hardware:
@@ -55,6 +86,8 @@ Connect the following hardware:
 This sketch uses the OneWire and DallasTemperature libraries with the 1-Wire bus on pin 7.
 
 It has provision for 2 x DS18B20 temperature probes. Connect these to VCC, GND & data to pin 7 with a 4.7k resistor between VCC & data.
+
+These sensors are known as tHi (the 'hot' sensor) and tLow (the 'cold' sensor). Because these sensors have specific usage then their addresses are stored in settings 
 
 ### I2C display
 
