@@ -36,7 +36,7 @@ The following settings are available:
 
 An angle bracket (">") shows the current setting being adjusted with the buttons (plus and minus) adjusting the value accordingly. tOn & tOff are adjusted in 0.1 steps and tMax in steps of 1.0.
 
-Long press plus/minus buttons to move to the next/previous paramter. A long press on the top or bottom parameter in the direction away from the others will move back to the 'Running' mode or on to the 'Factory Reset' screen.
+Long press plus/minus buttons to move to the next/previous parameter. A long press on the top or bottom parameter in the direction away from the others will move back to the 'Running' mode or on to the 'Factory Reset' screen.
 
 ### Factory Reset screen
 
@@ -44,7 +44,7 @@ From this screen, long press the minus button to return to 'Running' mode or the
 
 Factory Reset shows 3 options: "NO", "NO" and "YES". The selected option is highlighed with angle brakcets (eg: "< NO >"). Move between options with the plus/minus buttons.
 
-If either of the "NO" options are highlighted when using long press to return change away from this mode then no action will be taken. If "YES" is highlighed then all settings will be wiped (set to zero) and sensor addresses will also be cleared. This is basically the same as power on for the first time.
+If either of the "NO" options are highlighted when using long press to change away from this mode then no action will be taken. If "YES" is highlighed then all settings will be wiped (set to zero) and sensor addresses will also be cleared. This is basically the same as power on for the first time.
 
 ### Sensors screen
 
