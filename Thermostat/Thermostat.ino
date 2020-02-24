@@ -202,15 +202,20 @@ void modeChange() {
 
     case MODE_SETON:
       currentMode = MODE_SETOFF;
-      drawSetupBack();
+      drawSetupMode();
       break;
     
     case MODE_SETOFF:
       currentMode = MODE_SETMAX;
-      drawSetupBack();
+      drawSetupMode();
       break;
 
     case MODE_SETMAX:
+      currentMode = MODE_SETRUN;
+      drawSetupMode();
+      break;
+
+    case MODE_SETRUN:
       currentMode = MODE_RESET;
       saveSettings();
       resetOption = 0;
@@ -271,6 +276,13 @@ void handleButton(Button *button) {
             settings.tMax += button->stepDirection;
             drawSetupVars(false);
             break;
+          case MODE_SETRUN:
+            // I guess we could call drawRunState here but don't
+            // do that...just for consistency.
+            pumpRunning = !pumpRunning;
+            drawSetupVars(false);
+            setRelayState();
+            break;
           case MODE_RESET:
             resetOption += button->stepDirection;
             if (resetOption > 2) {
@@ -298,6 +310,10 @@ unsigned long lastHeartbeat = 0;
 boolean wasInvalid = true;
 boolean doneSensorRead = false;
 
+void setRelayState() {
+  digitalWrite(RELAY_PIN, pumpRunning ? HIGH : LOW);
+}
+
 void loop() {
   if (currentMode == MODE_RUNNING) {
     if (millis() - lastPoll >= TEMPERATURE_POLL) {
@@ -316,11 +332,16 @@ void loop() {
       // Regular running mode
 
       if (!allSensorsDefined() || !isValidTemp(tempLow) || !isValidTemp(tempHigh)) {
-        // Show sensor screen
-        drawSensors();
         // Force pump off on faulty sensors
         pumpRunning = false;
-        wasInvalid = true;
+
+        // Draw background if we're just going bad
+        if (!wasInvalid) {
+          drawSensorsBack();
+          wasInvalid = true;
+        }
+        // Always draw vars
+        drawSensorsVars();
       } else {
         if (wasInvalid) {
           wasInvalid = false;
@@ -340,7 +361,7 @@ void loop() {
         }
         drawRunVars();
       }
-      digitalWrite(RELAY_PIN, pumpRunning ? HIGH : LOW);
+      setRelayState();
     }
   }
 

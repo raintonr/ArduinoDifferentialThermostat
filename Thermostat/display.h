@@ -7,10 +7,13 @@ boolean isZeroAddress(DeviceAddress address);
 boolean isValidTemp(float temp);
 
 void drawSetupBack();
+void drawSetupMode();
 void drawSetupVars(boolean);
 void drawRunBack();
 void drawRunVars();
+void drawRunState();
 void drawHeartbeat();
 void drawResetBack();
 void drawResetVars();
-void drawSensors();
+void drawSensorsBack();
+void drawSensorsVars();

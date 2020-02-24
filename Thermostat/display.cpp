@@ -88,35 +88,54 @@ void printTemp(int x, int y, float temp, int dps) {
 // 1  tOn:99.9-
 // 2 tOff:99.9-
 // 3 tMax:99.9-
-// 4 
+// 4  Run: off
 
 void drawSetupBack() {
   oled.clear();
-  oled.setCursor(0, 0);
-  oled.print("tOn ");
+  oled.setCursor(1 * T_FONT_WIDTH, 0);
+  oled.print("tOn");
+
+  oled.setCursor(0, 1 * T_FONT_HEIGHT);
+  oled.print("tOff");
+
+  oled.setCursor(0, 2 * T_FONT_HEIGHT);
+  oled.print("tMax");
+
+  oled.setCursor(1 * T_FONT_WIDTH, 3 * T_FONT_HEIGHT);
+  oled.print("Run");
+
+  drawSetupMode();
+  drawSetupVars(true);
+}
+
+void drawSetupMode() {
+  oled.setCursor(4 * T_FONT_WIDTH, 0);
   if (currentMode == MODE_SETON) {
     oled.print(">");
   } else {
     oled.print(":");
   }
 
-  oled.setCursor(0, 1 * T_FONT_HEIGHT);
-  oled.print("tOff");
+  oled.setCursor(4 * T_FONT_WIDTH, 1 * T_FONT_HEIGHT);
   if (currentMode == MODE_SETOFF) {
     oled.print(">");
   } else {
     oled.print(":");
   }
 
-  oled.setCursor(0, 2 * T_FONT_HEIGHT);
-  oled.print("tMax");
+  oled.setCursor(4 * T_FONT_WIDTH, 2 * T_FONT_HEIGHT);
   if (currentMode == MODE_SETMAX) {
     oled.print(">");
   } else {
     oled.print(":");
   }
 
-  drawSetupVars(true);
+  oled.setCursor(4 * T_FONT_WIDTH, 3 * T_FONT_HEIGHT);
+  if (currentMode == MODE_SETRUN) {
+    oled.print(">");
+  } else {
+    oled.print(":");
+  }
 }
 
 void drawSetupVars(boolean drawAll) {
@@ -131,6 +150,9 @@ void drawSetupVars(boolean drawAll) {
   if (drawAll || currentMode == MODE_SETMAX) {
     oled.setCursor(5 * T_FONT_WIDTH, 2 * T_FONT_HEIGHT);
     printTemp(5, 2, settings.tMax, 1);
+  }
+  if (drawAll || currentMode == MODE_SETRUN) {
+    drawRunState();
   }
 }
 
@@ -154,18 +176,22 @@ void printHex(DeviceAddress address) {
   }
 }
 
-void drawSensors() {
+void drawSensorsBack() {
   oled.clear();
   oled.setCursor(0,0);
   oled.print("tLow:");
+
+  oled.setCursor(0, 2 * T_FONT_HEIGHT);
+  oled.print("tHi:");
+}
+
+void drawSensorsVars() {
   if (isValidTemp(tempLow)) {
     printTemp(5, 0, tempLow, 2);
   } else {
     oled.setCursor(5 * T_FONT_WIDTH, 0);
     oled.print("err!");
   }
-  oled.setCursor(0, 2 * T_FONT_HEIGHT);
-  oled.print("tHi:");
   if (isValidTemp(tempHigh)) {
     printTemp(4, 2, tempHigh, 2);
   } else {
@@ -195,7 +221,7 @@ void drawSensors() {
 // 1 tLow:99.9-
 // 2  tHi:99.9-
 // 3   dT:99.9-
-// 4  Run: OFF
+// 4  Run: off
 
 void drawRunBack() {
   oled.clear();
@@ -218,7 +244,10 @@ void drawRunVars() {
   printTemp(5, 0, tempLow, 2);
   printTemp(5, 1, tempHigh, 2);
   printTemp(5, 2, dT, 2);
+  drawRunState();
+}
 
+void drawRunState() {
   oled.setCursor(5 * T_FONT_WIDTH, 3 * T_FONT_HEIGHT);
   if (pumpRunning) {
     oled.print("ON ");

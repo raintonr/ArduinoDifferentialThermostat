@@ -7,8 +7,9 @@
 // - Setting tOn
 // - Setting tOff
 // - Setting tMax
+// - Setting manual run state
 // - Perform reset
-enum mode {MODE_RUNNING, MODE_SETON, MODE_SETOFF, MODE_SETMAX, MODE_RESET};
+enum mode {MODE_RUNNING, MODE_SETON, MODE_SETOFF, MODE_SETMAX, MODE_SETRUN, MODE_RESET};
 
 // Settings that will be stored in EEPROM
 struct Settings {
