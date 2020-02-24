@@ -192,9 +192,56 @@ void read1Wire() {
 }
 
 //////////////////////////////////////////////////////////////////////
-// Mode change
+// Mode changes, both previous and next.
+// I guess these could be nicer, but given all the other conditions
+// that would need to be checked maybe it's best they are just
+// two separate case statements.
 
-void modeChange() {
+void resetCheck() {
+  if (resetOption == 2) {
+    // Yes, they really selected factory reset!
+    factoryReset();
+    saveSettings();
+  }        
+}
+
+void modeChangePrev() {
+  switch (currentMode) {
+    case MODE_RUNNING:
+      currentMode = MODE_RESET;
+      drawResetBack();
+      break;
+
+    case MODE_SETON:
+      currentMode = MODE_RUNNING;
+      drawRunBack();
+      break;
+    
+    case MODE_SETOFF:
+      currentMode = MODE_SETON;
+      drawSetupMode();
+      break;
+
+    case MODE_SETMAX:
+      currentMode = MODE_SETOFF;
+      drawSetupMode();
+      break;
+
+    case MODE_SETRUN:
+      currentMode = MODE_SETMAX;
+      drawSetupMode();
+      break;
+
+    case MODE_RESET:
+      resetCheck();
+      currentMode = MODE_SETRUN;
+      drawSetupBack();
+      break;
+  }
+}
+
+
+void modeChangeNext() {
   switch (currentMode) {
     case MODE_RUNNING:
       currentMode = MODE_SETON;
@@ -219,16 +266,11 @@ void modeChange() {
     case MODE_SETRUN:
       currentMode = MODE_RESET;
       saveSettings();
-      resetOption = 0;
       drawResetBack();
       break;
 
     case MODE_RESET:
-      if (resetOption == 2) {
-        // Yes, they really selected factory reset!
-        factoryReset();
-        saveSettings();
-      }        
+      resetCheck();
       currentMode = MODE_RUNNING;
       drawRunBack();
       break;
@@ -289,9 +331,13 @@ void handleButton(Button *button) {
     if (state == HIGH) {
       // Require and extra long press to get out of MODE_RUNNING
       if ((millis() - button->debounceTime) >= (currentMode == MODE_RUNNING ? LONG_LONG_PRESS : LONG_PRESS) && !button->pressed) {
-        // This is a long press, which always triggers mode change
         button->pressed = true;
-        modeChange();
+        // This is a long press, which always triggers mode change
+        if (button->stepDirection > 0) {
+          modeChangePrev();
+        } else {
+          modeChangeNext();
+        }
       }
       button->released = false;
     } else if (state == LOW && !button->released) {

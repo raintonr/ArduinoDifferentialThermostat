@@ -264,6 +264,8 @@ void drawRunState() {
 // 4  < YES >
 
 void drawResetBack() {
+  // We always start at the top
+  resetOption = 0;
   oled.clear();
   oled.setCursor(0.5 * T_FONT_WIDTH, 0);
   oled.print("!!RESET!!");
