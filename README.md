@@ -21,7 +21,7 @@ In this mode (and only this mode), the relay will turn on and off automatically 
 
 ### Settings screen
 
-From 'Running mode' an extra long press (default of 1.5s) on either button moves to the settings screen. In this screen temperatures are not sensed and the relay will not turn on or off automatically.
+From 'Running mode' an extra long press (default of 1.5s) on either button moves to the settings screen.
 
 Use this screen to adjust the available settings or manually turn the relay on or off.
 
@@ -52,11 +52,11 @@ If either "NO" is highlighted on using long press to return to 'Running' mode th
 
 If the 1-Wire bus does not have 2 sensors preset, or they both cannot be read, or a sensor is swapped out for one that was previously present (ie. a DS18B20 failed and was replaced) then this screen with the status of tLow & tHi is shown.
 
-On sensor removal or failure this 'Sensors' screen is only shown from the 'Running' screen. Ie. if a sensor fails when adjusting settings then nothing will happen.
+On sensor removal or failure this 'Sensors' screen is only shown from the 'Running' screen. Ie. if a sensor fails when adjusting settings or on the 'Factory Reset' screen then nothing will happen.
 
 This screen shows for each sensor:
 
-- The current temperature or "err!" if the value cannot be read.
+- The current temperature or "err!" if the value cannot be read (or is considered spurious - below -100 or above 200 degees C).
 - The sensor's 1-Wire address if setup, or a message requesting it is connected.
 
 #### First run
@@ -67,7 +67,9 @@ If the board is first run with no sensors connected then this 'Sensors' screen w
 
 In this case, the next sensor detected on the 1-Wire bus will be assigned to the missing role. Eg. from no sensors found, connecting a sensor will assign this to tLow. Connecting a second sensor will assign that to tHi.
 
-In practice this means that if 2 (or more) sensors are connected to the 1-Wire bus on first run (or factory reset) they will be instantly detected and assigned to tLow & tHi in the order of that detection which may appear random. The only way to avoid 'random' assignment of roles to each sensor is to connect tLow then tHi in sequence as mentioned above.
+It is perfectly acceptable to connect VCC & GND of sensors before powering on the board, and then connect the data wires when it is powered on. In fact, this is the only way to assign roles to each sensor in a known order.
+
+In practice this means that if 2 (or more) sensors are connected to the 1-Wire bus on first run (or factory reset) they will be instantly detected and assigned to tLow & tHi in the order of that detection, which may appear random. The only way to avoid 'random' assignment of roles to each sensor is to connect tLow then tHi in sequence as mentioned above.
 
 #### Replacing a sensor
 
@@ -75,7 +77,7 @@ If a sensor fails then this 'Sensors' screen will be shown with an "err!" messag
 
 As sensors are assigned roles based on their address, and these are unique to every sensor then it is not possible to simply swap a defective sensor for a new one.
 
-In this case, perform a 'Factory Reset' as described above and follow the 'First run' procedure above to re-assign sensor roles as applicable.
+In this case (a sensor has failed), perform a 'Factory Reset' and follow the 'First run' procedure above to re-assign sensor roles as applicable.
 
 ## Hardware
 
