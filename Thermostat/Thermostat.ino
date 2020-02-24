@@ -21,6 +21,7 @@
 // Debounce & long press
 #define DEBOUNCE_DELAY 25
 #define LONG_PRESS 250
+#define LONG_LONG_PRESS 1500
 
 // Which pins are our buttons on
 #define B1_PIN 8
@@ -235,18 +236,59 @@ void modeChange() {
 }
 
 //////////////////////////////////////////////////////////////////////
+// Button click
+
+void buttonClick(Button *button) {
+  // Action depends on current mode.
+  // Do nothing in MODE_RUNNING so don't mention that below.
+  switch (currentMode) {
+  case MODE_SETON:
+    settings.dtOn += button->stepDirection * 0.1;
+    drawSetupVars(false);
+    break;
+  case MODE_SETOFF:
+    settings.dtOff += button->stepDirection * 0.1;
+    drawSetupVars(false);
+    break;
+  case MODE_SETMAX:
+    settings.tMax += button->stepDirection;
+    drawSetupVars(false);
+    break;
+  case MODE_SETRUN:
+    // I guess we could call drawRunState here but don't
+    // do that...just for consistency.
+    pumpRunning = !pumpRunning;
+    drawSetupVars(false);
+    setRelayState();
+    break;
+  case MODE_RESET:
+    resetOption += button->stepDirection;
+    if (resetOption > 2) {
+      resetOption = 2;
+    } else if (resetOption < 0) {
+      resetOption = 0;
+    }
+    drawResetVars();
+  }
+}  
+
+//////////////////////////////////////////////////////////////////////
 // Button handling
 // This is why we have button objects defined and setup above. So we
 // can use a function for the debounce/long press detection.
 
 void handleButton(Button *button) {
+  // Get the current button state...
   int state = digitalRead(button->pin);
+
+  // ... and handle it
   if (state != button->lastState) {
     button->debounceTime = millis();
     button->lastState = state;
   } else if ((millis() - button->debounceTime) >= DEBOUNCE_DELAY) {
     if (state == HIGH) {
-      if ((millis() - button->debounceTime) >= LONG_PRESS && !button->pressed) {
+      // Require and extra long press to get out of MODE_RUNNING
+      if ((millis() - button->debounceTime) >= (currentMode == MODE_RUNNING ? LONG_LONG_PRESS : LONG_PRESS) && !button->pressed) {
         // This is a long press, which always triggers mode change
         button->pressed = true;
         modeChange();
@@ -259,39 +301,7 @@ void handleButton(Button *button) {
         button->pressed = false;
       } else {
         // Button was just released but long press wasn't triggered so must be a click
-        // Action depends on current mode
-        switch (currentMode) {
-          case MODE_RUNNING:
-            // Do nothing
-            break;
-          case MODE_SETON:
-            settings.dtOn += button->stepDirection * 0.1;
-            drawSetupVars(false);
-            break;
-          case MODE_SETOFF:
-            settings.dtOff += button->stepDirection * 0.1;
-            drawSetupVars(false);
-            break;
-          case MODE_SETMAX:
-            settings.tMax += button->stepDirection;
-            drawSetupVars(false);
-            break;
-          case MODE_SETRUN:
-            // I guess we could call drawRunState here but don't
-            // do that...just for consistency.
-            pumpRunning = !pumpRunning;
-            drawSetupVars(false);
-            setRelayState();
-            break;
-          case MODE_RESET:
-            resetOption += button->stepDirection;
-            if (resetOption > 2) {
-              resetOption = 2;
-            } else if (resetOption < 0) {
-              resetOption = 0;
-            }
-            drawResetVars();
-        }
+        buttonClick(button);
       }
       button->released = true;
     }
