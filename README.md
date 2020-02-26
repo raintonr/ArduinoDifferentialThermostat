@@ -19,9 +19,9 @@ On first run, if both DS18B20 sensors are connected the screen will display 'Run
 
 In this mode (and only this mode), the relay will turn on and off automatically based on the sensors and settings values configured.
 
-### Settings screen
+From 'Running mode' an extra long press (default of 1.5s) on the plus button moves to the 'Settings' screen, and on the minus button moves to 'Factory Reset' screen.
 
-From 'Running mode' an extra long press (default of 1.5s) on either button moves to the settings screen.
+### Settings screen
 
 Use this screen to adjust the available settings or manually turn the relay on or off.
 
@@ -36,17 +36,15 @@ The following settings are available:
 
 An angle bracket (">") shows the current setting being adjusted with the buttons (plus and minus) adjusting the value accordingly. tOn & tOff are adjusted in 0.1 steps and tMax in steps of 1.0.
 
-tOn is being adjusted when the screen is first displayed. Long press either button to move to the next paramter. Long press on 'Run' will move on to the 'Factory Reset' screen (and after back to 'Running' mode).
+Long press plus/minus buttons to move to the next/previous parameter. A long press on the top or bottom parameter in the direction away from the others will move back to the 'Running' mode or on to the 'Factory Reset' screen.
 
 ### Factory Reset screen
 
-The 'Factory Reset' screen is reached after settings (long press from 'Run' adjustment).
-
-From this screen, long press either button to return to 'Running' mode.
+From this screen, long press the minus button to return to 'Running' mode or the plus button to move to 'Settings' screen.
 
 Factory Reset shows 3 options: "NO", "NO" and "YES". The selected option is highlighed with angle brakcets (eg: "< NO >"). Move between options with the plus/minus buttons.
 
-If either "NO" is highlighted on using long press to return to 'Running' mode then no action will be taken. If "YES" is highlighed then all settings will be wiped (set to zero) and sensor addresses will also be cleared. This is basically the same as power on for the first time.
+If either of the "NO" options are highlighted when using long press to change away from this mode then no action will be taken. If "YES" is highlighed then all settings will be wiped (set to zero) and sensor addresses will also be cleared. This is basically the same as power on for the first time.
 
 ### Sensors screen
 
