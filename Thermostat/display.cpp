@@ -23,13 +23,17 @@ void setupDisplay() {
   oled.setScrollMode(SCROLL_MODE_OFF);
   oled.setFont(Adafruit5x7);
   oled.set2X();
+
+  // We start in running mode, so draw that background.
+  drawRunBack();
 }
 
 //////////////////////////////////////////////////////////////////////
 // Our display is 128x64 (wide/high).
-// 0,0 is top left
-// In text size 2 this gives 4 rows of 10 characters
-// Text size 1 gives 8 rows of 21 characters
+// 0,0 is top left.
+// In text size 2 this gives 4 rows of 10 characters.
+// Text size 1 gives 8 rows of 21 characters.
+// We use the last column in size 1 for the heartbeat though.
 
 void printTemp(int x, int y, float temp, int dps) {
   // Print the sign (or wipe with space)
@@ -88,7 +92,7 @@ void printTemp(int x, int y, float temp, int dps) {
 // 1  tOn:99.9-
 // 2 tOff:99.9-
 // 3 tMax:99.9-
-// 4  Run: off
+// 4  Run:off
 
 void drawSetupBack() {
   oled.clear();
@@ -105,55 +109,38 @@ void drawSetupBack() {
   oled.print("Run");
 
   drawSetupMode();
-  drawSetupVars(true);
+
+  drawSetuptOn();
+  drawSetuptOff();
+  drawSetuptMax();
+  drawRunState();
 }
 
 void drawSetupMode() {
   oled.setCursor(4 * T_FONT_WIDTH, 0);
-  if (currentMode == MODE_SETON) {
-    oled.print(">");
-  } else {
-    oled.print(":");
-  }
+  oled.print(currentMode == MODE_SETON ? ">" : ":");
 
   oled.setCursor(4 * T_FONT_WIDTH, 1 * T_FONT_HEIGHT);
-  if (currentMode == MODE_SETOFF) {
-    oled.print(">");
-  } else {
-    oled.print(":");
-  }
+  oled.print(currentMode == MODE_SETOFF ? ">" : ":");
 
   oled.setCursor(4 * T_FONT_WIDTH, 2 * T_FONT_HEIGHT);
-  if (currentMode == MODE_SETMAX) {
-    oled.print(">");
-  } else {
-    oled.print(":");
-  }
+  oled.print(currentMode == MODE_SETMAX ? ">" : ":");
 
   oled.setCursor(4 * T_FONT_WIDTH, 3 * T_FONT_HEIGHT);
-  if (currentMode == MODE_SETRUN) {
-    oled.print(">");
-  } else {
-    oled.print(":");
-  }
+  oled.print(currentMode == MODE_SETRUN ? ">" : ":");
 }
 
-void drawSetupVars(boolean drawAll) {
-  if (drawAll || currentMode == MODE_SETON) {
-    oled.setCursor(5 * T_FONT_WIDTH, 0);
-    printTemp(5, 0, settings.dtOn, 1);
-  }
-  if (drawAll || currentMode == MODE_SETOFF) {
-    oled.setCursor(5 * T_FONT_WIDTH, 1 * T_FONT_HEIGHT);
-    printTemp(5, 1, settings.dtOff, 1);
-  }
-  if (drawAll || currentMode == MODE_SETMAX) {
-    oled.setCursor(5 * T_FONT_WIDTH, 2 * T_FONT_HEIGHT);
-    printTemp(5, 2, settings.tMax, 1);
-  }
-  if (drawAll || currentMode == MODE_SETRUN) {
-    drawRunState();
-  }
+void drawSetuptOn() {
+  oled.setCursor(5 * T_FONT_WIDTH, 0);
+  printTemp(5, 0, settings.dtOn, 1);
+}
+void drawSetuptOff() {
+  oled.setCursor(5 * T_FONT_WIDTH, 1 * T_FONT_HEIGHT);
+  printTemp(5, 1, settings.dtOff, 1);
+}
+void drawSetuptMax() {
+  oled.setCursor(5 * T_FONT_WIDTH, 2 * T_FONT_HEIGHT);
+  printTemp(5, 2, settings.tMax, 1);
 }
 
 // Draw the sensors screen:
@@ -183,6 +170,10 @@ void drawSensorsBack() {
 
   oled.setCursor(0, 2 * T_FONT_HEIGHT);
   oled.print("tHi:");
+
+  // There's no need to draw vars here because the function
+  // below will be called immediately after drawing this
+  // background.
 }
 
 void drawSensorsVars() {
@@ -221,7 +212,7 @@ void drawSensorsVars() {
 // 1 tLow:99.9-
 // 2  tHi:99.9-
 // 3   dT:99.9-
-// 4  Run: off
+// 4  Run:off
 
 void drawRunBack() {
   oled.clear();
@@ -238,9 +229,9 @@ void drawRunBack() {
   oled.print("Run:");
 
   drawRunVars();
+  drawRunState();
 }
 void drawRunVars() {
-  oled.setCursor(5 * T_FONT_WIDTH, 0);
   printTemp(5, 0, tempLow, 2);
   printTemp(5, 1, tempHigh, 2);
   printTemp(5, 2, dT, 2);
@@ -249,11 +240,7 @@ void drawRunVars() {
 
 void drawRunState() {
   oled.setCursor(5 * T_FONT_WIDTH, 3 * T_FONT_HEIGHT);
-  if (pumpRunning) {
-    oled.print("ON ");
-  } else {
-    oled.print("off ");
-  }
+  oled.print(pumpRunning ? "ON " : "off ");
 }
 
 // Draw the reset screen:

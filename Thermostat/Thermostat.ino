@@ -12,11 +12,14 @@
 // How many milliseonds between 1-wire polling
 #define TEMPERATURE_POLL 2000
 
+// Allow sensors to stabalise after power on, so do first poll after...
+#define FIRST_POLL_AFTER 1000
+
 // How many milliseonds after 1-wire polling should we read temperatures
 #define TEMPERATURE_READ_DELAY 750
 
 // Heartbeat display interval in ms
-#define HEARTBEAT 500
+#define HEARTBEAT 150
 
 // Debounce & long press
 #define DEBOUNCE_DELAY 25
@@ -286,21 +289,21 @@ void buttonClick(Button *button) {
   switch (currentMode) {
   case MODE_SETON:
     settings.dtOn += button->stepDirection * 0.1;
-    drawSetupVars(false);
+    drawSetuptOn();
     break;
   case MODE_SETOFF:
     settings.dtOff += button->stepDirection * 0.1;
-    drawSetupVars(false);
+    drawSetuptOff();
     break;
   case MODE_SETMAX:
     settings.tMax += button->stepDirection;
-    drawSetupVars(false);
+    drawSetuptMax();
     break;
   case MODE_SETRUN:
     // I guess we could call drawRunState here but don't
     // do that...just for consistency.
     pumpRunning = !pumpRunning;
-    drawSetupVars(false);
+    drawRunState();
     setRelayState();
     break;
   case MODE_RESET:
@@ -361,9 +364,9 @@ void handleButton(Button *button) {
 // Note that millis() function loops back to zero every 49 days or so but as
 // it's an unsigned long don't have to worry about this. Same for the above.
 
-unsigned long lastPoll = 0;
+unsigned long lastPoll = FIRST_POLL_AFTER;
 unsigned long lastHeartbeat = 0;
-boolean wasInvalid = true;
+boolean wasInvalid = false;
 boolean doneSensorRead = false;
 
 void setRelayState() {
@@ -396,9 +399,10 @@ void loop() {
           drawSensorsBack();
           wasInvalid = true;
         }
-        // Always draw vars
+        // Always draw sensor vars
         drawSensorsVars();
       } else {
+        // If we are returning from invalid state the draw background.
         if (wasInvalid) {
           wasInvalid = false;
           drawRunBack();

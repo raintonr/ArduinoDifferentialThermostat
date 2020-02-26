@@ -8,12 +8,18 @@ boolean isValidTemp(float temp);
 
 void drawSetupBack();
 void drawSetupMode();
-void drawSetupVars(boolean);
+void drawSetuptOn();
+void drawSetuptOff();
+void drawSetuptMax();
+
 void drawRunBack();
 void drawRunVars();
 void drawRunState();
+
 void drawHeartbeat();
+
 void drawResetBack();
 void drawResetVars();
+
 void drawSensorsBack();
 void drawSensorsVars();
