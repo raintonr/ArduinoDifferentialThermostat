@@ -217,6 +217,7 @@ void modeChangePrev() {
 
     case MODE_SETON:
       currentMode = MODE_RUNNING;
+      saveSettings();
       drawRunBack();
       break;
     
